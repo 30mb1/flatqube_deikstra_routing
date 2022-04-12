@@ -1,7 +1,6 @@
 import requests
 import logging
 from collections import defaultdict
-from multiprocessing.pool import ThreadPool
 import json
 logging.getLogger().setLevel(logging.INFO)
 
@@ -39,11 +38,28 @@ def initialize_meta():
 def initialize_pairs_data():
     global ALL_TOKENS
     global PAIRS_SUPPLY
+    global PRICES
 
-    with open('pairs.txt', 'r') as f:
-        lines = [line.split(',') for line in f.readlines()]
+    body = {
+        "currencyAddresses": [],
+        "limit": 100,
+        "offset": 0,
+        "tvlAmountGe": "50000",
+        "ordering": "tvlascending",
+        "whiteListUri": "https://raw.githubusercontent.com/broxus/ton-assets/master/manifest.json"
+    }
+    res = requests.post('https://ton-swap-indexer-test.broxus.com/v1/pairs/', json=body)
+    pairs = res.json()['pairs']
 
-    for left_token, right_token, left_bal, right_bal in lines:
+    for pair in pairs:
+        left_token = pair['meta']['baseAddress']
+        right_token = pair['meta']['counterAddress']
+        left_bal = pair['leftLocked']
+        right_bal = pair['rightLocked']
+
+        PRICES[left_token] = float(pair['leftPrice'])
+        PRICES[right_token] = float(pair['rightPrice'])
+
         ALL_TOKENS.append(left_token)
         ALL_TOKENS.append(right_token)
         # save vertexes
@@ -58,13 +74,6 @@ def initialize_pairs_data():
 
     # remove duplicates
     ALL_TOKENS = list(set(ALL_TOKENS))
-
-
-def initialize_prices_data():
-    global PRICES
-
-    with open('prices.json', 'r') as f:
-        PRICES = json.load(f)
 
 
 def sort_tokens(from_token, to_token):
@@ -110,5 +119,4 @@ def symbol(token_addr):
 
 def initialize():
     initialize_pairs_data()
-    initialize_prices_data()
     initialize_meta()
